@@ -10,8 +10,10 @@
 #include "mqtt_client.h"
 #include <Wire.h>
 #include <TinyGsmClient.h>
-#include <SoftwareSerial.h>
-SoftwareSerial SerialAT(16, 17);  // RX, TX
+#include <HardwareSerial.h>
+HardwareSerial SerialAT (2);
+//#include <SoftwareSerial.h>
+//SoftwareSerial SerialAT(16, 17);  // RX, TX
 //#define SerialAT Serial1 // Set serial for AT commands
 
 // Define the serial console for debug prints, if needed
@@ -220,7 +222,7 @@ void setup() {
   Serial.println("Wait...");
 
   // Set GSM module baud rate and UART pins
-  SerialAT.begin(115200);
+  SerialAT.begin(115200, SERIAL_8N1, 16, 17);
   delay(6000);
 
   // Restart takes quite some time
