@@ -40,6 +40,8 @@ const char gprsPass[] = "";
 // SIM card PIN (leave empty, if not defined)
 const char simPIN[]   = ""; 
 
+// If possible, make this creds written in ESP NVM instead of hardcoding it like this.
+// Will create another file to load and delete NVM if this is going to be implemented.
 const char *ssid = "CASCADE_HOUSE01 2.4G";
 const char *password = "Mandorgoweng8601";
 
@@ -50,8 +52,8 @@ const char* mqttPassword = "0bPSePKiWVoFBxSZHeQcxNqmYN1bn0Rv";  // MQTT password
 int mqttPort = 8883;
 const char *ROOT_CERT = "-----BEGIN CERTIFICATE-----\nMIIFYDCCBEigAwIBAgIQQAF3ITfU6UK47naqPGQKtzANBgkqhkiG9w0BAQsFADA/MSQwIgYDVQQKExtEaWdpdGFsIFNpZ25hdHVyZSBUcnVzdCBDby4xFzAVBgNVBAMTDkRTVCBSb290IENBIFgzMB4XDTIxMDEyMDE5MTQwM1oXDTI0MDkzMDE4MTQwM1owTzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2VhcmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQCt6CRz9BQ385ueK1coHIe+3LffOJCMbjzmV6B493XCov71am72AE8o295ohmxEk7axY/0UEmu/H9LqMZshftEzPLpI9d1537O4/xLxIZpLwYqGcWlKZmZsj348cL+tKSIG8+TA5oCu4kuPt5l+lAOf00eXfJlII1PoOK5PCm+DLtFJV4yAdLbaL9A4jXsDcCEbdfIwPPqPrt3aY6vrFk/CjhFLfs8L6P+1dy70sntK4EwSJQxwjQMpoOFTJOwT2e4ZvxCzSow/iaNhUd6shweU9GNx7C7ib1uYgeGJXDR5bHbvO5BieebbpJovJsXQEOEO3tkQjhb7t/eo98flAgeYjzYIlefiN5YNNnWe+w5ysR2bvAP5SQXYgd0FtCrWQemsAXaVCg/Y39W9Eh81LygXbNKYwagJZHduRze6zqxZXmidf3LWicUGQSk+WT7dJvUkyRGnWqNMQB9GoZm1pzpRboY7nn1ypxIFeFntPlF4FQsDj43QLwWyPntKHEtzBRL8xurgUBN8Q5N0s8p0544fAQjQMNRbcTa0B7rBMDBcSLeCO5imfWCKoqMpgsy6vYMEG6KDA0Gh1gXxG8K28Kh8hjtGqEgqiNx2mna/H2qlPRmP6zjzZN7IKw0KKP/32+IVQtQi0Cdd4Xn+GOdwiK1O5tmLOsbdJ1Fu/7xk9TNDTwIDAQABo4IBRjCCAUIwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAQYwSwYIKwYBBQUHAQEEPzA9MDsGCCsGAQUFBzAChi9odHRwOi8vYXBwcy5pZGVudHJ1c3QuY29tL3Jvb3RzL2RzdHJvb3RjYXgzLnA3YzAfBgNVHSMEGDAWgBTEp7Gkeyxx+tvhS5B1/8QVYIWJEDBUBgNVHSAETTBLMAgGBmeBDAECATA/BgsrBgEEAYLfEwEBATAwMC4GCCsGAQUFBwIBFiJodHRwOi8vY3BzLnJvb3QteDEubGV0c2VuY3J5cHQub3JnMDwGA1UdHwQ1MDMwMaAvoC2GK2h0dHA6Ly9jcmwuaWRlbnRydXN0LmNvbS9EU1RST09UQ0FYM0NSTC5jcmwwHQYDVR0OBBYEFHm0WeZ7tuXkAXOACIjIGlj26ZtuMA0GCSqGSIb3DQEBCwUAA4IBAQAKcwBslm7/DlLQrt2M51oGrS+o44+/yQoDFVDC5WxCu2+b9LRPwkSICHXM6webFGJueN7sJ7o5XPWioW5WlHAQU7G75K/QosMrAdSW9MUgNTP52GE24HGNtLi1qoJFlcDyqSMo59ahy2cI2qBDLKobkx/J3vWraV0T9VuGWCLKTVXkcGdtwlfFRjlBz4pYg1htmf5X6DYO8A4jqv2Il9DjXA6USbW1FzXSLr9Ohe8Y4IWS6wY7bCkjCWDcRQJMEhg76fsO3txE+FiYruq9RUWhiF1myv4Q6W+CyBFCDfvp7OOGAN6dEOM4+qR9sdjoSYKEBpsr6GtPAQw4dy753ec5\n-----END CERTIFICATE-----";
 
-const char* topicOutput1 = "/swa/commands";
-const char* topicCrowd = "/swa/test";
+const char* topicBus = "/track/bus";
+const char* topicCrowd = "/track/people";
 
 WiFiClientSecure wifiClient;
 TinyGsmClient client(modem);
@@ -193,13 +195,12 @@ void reconnect() {
   Serial.println("Connecting to MQTT Broker...");
   while (!mqtt.connected()) {
       Serial.println("Reconnecting to MQTT Broker..");
-      String clientId = "ESP32Client-";
-      clientId += String(random(0xffff), HEX);
+      String clientId = "ESP32Client-capstone";
       
       if (mqtt.connect(clientId.c_str(), mqttUsername, mqttPassword)) {
         Serial.println("Connected.");
         // subscribe to topic
-        mqtt.subscribe(topicOutput1);
+        // mqtt.subscribe(topicOutput1);
       }
       
   }
@@ -228,55 +229,6 @@ int checkBus(){
   }
 
   return adaBus;
-}
-
-void setup() {
-  // Set console baud rate
-  Serial.begin(115200);
-  delay(10);
-  Serial.println("starting!");
-  // Start I2C communication
-  I2CPower.begin(I2C_SDA, I2C_SCL, 400000);
-  
-  // Keep power when running from battery
-  bool isOk = setPowerBoostKeepOn(1);
-  Serial.println(String("IP5306 KeepOn ") + (isOk ? "OK" : "FAIL"));
-  Serial.println("Wait...");
-
-  // Set GSM module baud rate and UART pins
-  SerialAT.begin(115200, SERIAL_8N1, 16, 17);
-  delay(6000);
-
-  // Restart takes quite some time
-  // To skip it, call init() instead of restart()
-  Serial.println("Initializing modem...");
-  modem.restart();
-  // modem.init();
-
-  String modemInfo = modem.getModemInfo();
-  Serial.print("Modem Info: ");
-  Serial.println(modemInfo);
-
-  // Unlock your SIM card with a PIN if needed
-  //if ( GSM_PIN && modem.getSimStatus() != 3 ) {
-  //  modem.simUnlock(GSM_PIN);
-  //}
-
-  Serial.print("Connecting to APN: ");
-  Serial.print(apn);
-  if (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
-    Serial.println(" fail");
-    ESP.restart();
-  }
-  else {
-    Serial.println(" OK");
-  }
-  
-  if (modem.isGprsConnected()) {
-    Serial.println("GPRS connected");
-  }
-
-  setupMQTT();
 }
 
 void purge(){ // This manages the TTL
@@ -344,6 +296,55 @@ void showAll() {
   Serial.println(theSet.size());
 }
 
+void setup() {
+  // Set console baud rate
+  Serial.begin(115200);
+  delay(10);
+  Serial.println("starting!");
+  // Start I2C communication
+  I2CPower.begin(I2C_SDA, I2C_SCL, 400000);
+  
+  // Keep power when running from battery
+  bool isOk = setPowerBoostKeepOn(1);
+  Serial.println(String("IP5306 KeepOn ") + (isOk ? "OK" : "FAIL"));
+  Serial.println("Wait...");
+
+  // Set GSM module baud rate and UART pins
+  SerialAT.begin(115200, SERIAL_8N1, 16, 17);
+  delay(6000);
+
+  // Restart takes quite some time
+  // To skip it, call init() instead of restart()
+  Serial.println("Initializing modem...");
+  modem.restart();
+  // modem.init();
+
+  String modemInfo = modem.getModemInfo();
+  Serial.print("Modem Info: ");
+  Serial.println(modemInfo);
+
+  // Unlock your SIM card with a PIN if needed
+  //if ( GSM_PIN && modem.getSimStatus() != 3 ) {
+  //  modem.simUnlock(GSM_PIN);
+  //}
+
+  Serial.print("Connecting to APN: ");
+  Serial.print(apn);
+  if (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
+    Serial.println(" fail");
+    ESP.restart();
+  }
+  else {
+    Serial.println(" OK");
+  }
+  
+  if (modem.isGprsConnected()) {
+    Serial.println("GPRS connected");
+  }
+
+  setupMQTT();
+}
+
 void loop() {
   configurePromiscuousWiFi();
 
@@ -371,6 +372,7 @@ void loop() {
   if (!mqtt.connected())
     reconnect();
   mqtt.publish(topicCrowd, String(theSet.size()).c_str());
+  mqtt.publish(topicBus, String(busStatus));
   //    curChannel++;
   delay(2000);
 
