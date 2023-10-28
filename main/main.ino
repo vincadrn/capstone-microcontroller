@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
+#include <algorithm>
 #include <set>
 #include "esp_wifi.h"
 #include "mqtt_client.h"
@@ -28,9 +29,6 @@ HardwareSerial SerialAT (2);
 std::set<String> theSet;
 unsigned long startTime = millis();
 unsigned long endTime;
-
-String maclist[64][3]; 
-int listcount = 0;
 
 // Your GPRS credentials, if any
 const char apn[] = ""; // APN (example: internet.vodafone.pt) use https://wiki.apnchanger.org
@@ -67,8 +65,6 @@ PubSubClient mqtt(client);
 TwoWire I2CPower = TwoWire(0); // I2C for SIM800 (to keep it running when powered from battery)
 #define IP5306_ADDR          0x75
 #define IP5306_REG_SYS_CTL0  0x00
-
-String defaultTTL = "60"; // Maximum time (Apx seconds) elapsed before device is consirded offline
 
 const wifi_promiscuous_filter_t filt={ //Idk what this does
     .filter_mask=WIFI_PROMIS_FILTER_MASK_MGMT|WIFI_PROMIS_FILTER_MASK_DATA
@@ -119,28 +115,6 @@ void sniffer(void* buf, wifi_promiscuous_pkt_type_t type) { //This is where pack
   mac.toUpperCase();
 
   theSet.emplace(mac);
-  
-  int added = 0;
-  for(int i=0;i<=63;i++){ // checks if the MAC address has been added before
-    if(mac == maclist[i][0]){
-      maclist[i][1] = defaultTTL;
-      if(maclist[i][2] == "OFFLINE"){
-        maclist[i][2] = "0";
-      }
-      added = 1;
-    }
-  }
-  
-  if(added == 0){ // If its new. add it to the array.
-    maclist[listcount][0] = mac;
-    maclist[listcount][1] = defaultTTL;
-    //Serial.println(mac);
-    listcount ++;
-    if(listcount >= 64){
-      Serial.println("Too many addresses");
-      listcount = 0;
-    }
-  }
 }
 
 void configurePromiscuousWiFi() {
@@ -167,14 +141,6 @@ void connectToWiFi() {
   Serial.print("Connected.");  
 }
 
-void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Callback - ");
-  Serial.print("Message:");
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
-}
-
 bool setPowerBoostKeepOn(int en){
   I2CPower.beginTransmission(IP5306_ADDR);
   I2CPower.write(IP5306_REG_SYS_CTL0);
@@ -188,7 +154,6 @@ bool setPowerBoostKeepOn(int en){
 
 void setupMQTT() {
   mqtt.setServer(broker, mqttPort);
-  mqtt.setCallback(mqttCallback); // set the callback function
 }
 
 void reconnect() {
@@ -231,67 +196,10 @@ int checkBus(){
   return adaBus;
 }
 
-void purge(){ // This manages the TTL
-  for(int i=0;i<=63;i++){
-    if(!(maclist[i][0] == "")){
-      int ttl = (maclist[i][1].toInt());
-      ttl --;
-      if(ttl <= 0){
-        //Serial.println("OFFLINE: " + maclist[i][0]);
-        maclist[i][2] = "OFFLINE";
-        maclist[i][1] = defaultTTL;
-      }else{
-        maclist[i][1] = String(ttl);
-      }
-    }
-  }
-}
-
-void updatetime(){ // This updates the time the device has been online for
-  for(int i=0;i<=63;i++){
-    if(!(maclist[i][0] == "")){
-      if(maclist[i][2] == "")maclist[i][2] = "0";
-      if(!(maclist[i][2] == "OFFLINE")){
-          int timehere = (maclist[i][2].toInt());
-          timehere ++;
-          maclist[i][2] = String(timehere);
-      }
-      
-      //Serial.println(maclist[i][0] + " : " + maclist[i][2]);
-      
-    }
-  }
-}
-
-//void showpeople(){ // This checks if the MAC is in the reckonized list and then displays it on the OLED and/or prints it to serial.
-//  String forScreen = "";
-//  for(int i=0;i<=63;i++){
-//    String tmp1 = maclist[i][0];
-//    if(!(tmp1 == "")){
-//      for(int j=0;j<=9;j++){
-//        String tmp2 = KnownMac[j][1];
-//        if(tmp1 == tmp2){
-//          forScreen += (KnownMac[j][0] + " : " + maclist[i][2] + "\n");
-//          Serial.print(KnownMac[j][0] + " : " + tmp1 + " : " + maclist[i][2] + "\n -- \n");
-//        }
-//      }
-//    }
-//  }
-//  update_screen_text(forScreen);
-//}
-
 void showAll() {
-  bool isEmpty = false;
-  for(int i = 0; i < 64; i++) {
-    for(int j = 0; j < 3; j++) {
-      if (maclist[i][0] == "") isEmpty = true;
-      Serial.print(maclist[i][j]);
-      Serial.print(" | ");
-    }
-    if (isEmpty) break;
-    Serial.println("");
-  }
-  Serial.println();
+  std::for_each(theSet.cbegin(), theSet.cend(), [](String x) {
+    Serial.println(x);
+  });
   Serial.print("Set: ");
   Serial.println(theSet.size());
 }
@@ -352,9 +260,6 @@ void loop() {
     curChannel = 1;
   }
   esp_wifi_set_channel(curChannel, WIFI_SECOND_CHAN_NONE);
-  updatetime();
-  purge();
-  //showpeople();
   showAll();
   endTime = millis();
 
