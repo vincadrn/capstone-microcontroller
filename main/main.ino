@@ -38,8 +38,8 @@ const char simPIN[]   = "";
 
 // If possible, make this creds written in ESP NVM instead of hardcoding it like this.
 // Will create another file to load and delete NVM if this is going to be implemented.
-const char *ssid = "CASCADE_HOUSE01 2.4G";
-const char *password = "Mandorgoweng8601";
+const char *ssid = "Vincent";
+const char *password = "blessedfamily";
 
 // MQTT details
 const char* broker = "vulture.rmq.cloudamqp.com";                    // Public IP address or domain name
@@ -53,7 +53,7 @@ const char* topicCrowd = "/track/people";
 
 WiFiClientSecure wifiClient;
 TinyGsmClient client(modem);
-PubSubClient mqtt(client);
+PubSubClient mqtt(wifiClient);
 
 #define echoPin  18 
 #define trigPin   5
@@ -207,46 +207,46 @@ void setup() {
   Serial.begin(115200);
   delay(10);
   Serial.println("starting!");
-  // Start I2C communication
-  I2CPower.begin(I2C_SDA, I2C_SCL, 400000);
-  
-  // Keep power when running from battery
-  bool isOk = setPowerBoostKeepOn(1);
-  Serial.println(String("IP5306 KeepOn ") + (isOk ? "OK" : "FAIL"));
-  Serial.println("Wait...");
-
-  // Set GSM module baud rate and UART pins
-  SerialAT.begin(115200, SERIAL_8N1, 16, 17);
-  delay(6000);
-
-  // Restart takes quite some time
-  // To skip it, call init() instead of restart()
-  Serial.println("Initializing modem...");
-  modem.restart();
-  // modem.init();
-
-  String modemInfo = modem.getModemInfo();
-  Serial.print("Modem Info: ");
-  Serial.println(modemInfo);
-
-  // Unlock your SIM card with a PIN if needed
-  //if ( GSM_PIN && modem.getSimStatus() != 3 ) {
-  //  modem.simUnlock(GSM_PIN);
-  //}
-
-  Serial.print("Connecting to APN: ");
-  Serial.print(apn);
-  if (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
-    Serial.println(" fail");
-    ESP.restart();
-  }
-  else {
-    Serial.println(" OK");
-  }
-  
-  if (modem.isGprsConnected()) {
-    Serial.println("GPRS connected");
-  }
+//  // Start I2C communication
+//  I2CPower.begin(I2C_SDA, I2C_SCL, 400000ul);
+//  
+//  // Keep power when running from battery
+//  bool isOk = setPowerBoostKeepOn(1);
+//  Serial.println(String("IP5306 KeepOn ") + (isOk ? "OK" : "FAIL"));
+//  Serial.println("Wait...");
+//
+//  // Set GSM module baud rate and UART pins
+//  SerialAT.begin(115200, SERIAL_8N1, 16, 17);
+//  delay(6000);
+//
+//  // Restart takes quite some time
+//  // To skip it, call init() instead of restart()
+//  Serial.println("Initializing modem...");
+//  modem.restart();
+//  // modem.init();
+//
+//  String modemInfo = modem.getModemInfo();
+//  Serial.print("Modem Info: ");
+//  Serial.println(modemInfo);
+//
+//  // Unlock your SIM card with a PIN if needed
+//  //if ( GSM_PIN && modem.getSimStatus() != 3 ) {
+//  //  modem.simUnlock(GSM_PIN);
+//  //}
+//
+//  Serial.print("Connecting to APN: ");
+//  Serial.print(apn);
+//  if (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
+//    Serial.println(" fail");
+//    ESP.restart();
+//  }
+//  else {
+//    Serial.println(" OK");
+//  }
+//  
+//  if (modem.isGprsConnected()) {
+//    Serial.println("GPRS connected");
+//  }
 
   setupMQTT();
 }
@@ -270,12 +270,13 @@ void loop() {
   connectToWiFi();
   wifiClient.setCACert(ROOT_CERT);
 
-  int busStatus = checkBus();
+//  int busStatus = checkBus();
+  int busStatus = 1;
 
   if (!mqtt.connected())
     reconnect();
   mqtt.publish(topicCrowd, String(theSet.size()).c_str());
-  mqtt.publish(topicBus, String(busStatus));
+  if (busStatus) mqtt.publish(topicBus, String(busStatus).c_str());
   //    curChannel++;
   delay(2000);
 
