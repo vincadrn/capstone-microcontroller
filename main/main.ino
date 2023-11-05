@@ -1,5 +1,11 @@
 #define TINY_GSM_MODEM_SIM800 // Select your modem: Modem is SIM800L
 #define TINY_GSM_DEBUG Serial // Define the serial console for debug prints, if needed
+//#define SerialSIM Serial2
+#define AT_BAUD_RATE 9600
+// Define how you're planning to connect to the internet.
+// This is only needed for this example, not in other code.
+#define TINY_GSM_USE_GPRS true
+#define TINY_GSM_USE_WIFI false
 #define GSM_PIN ""  // set GSM PIN, if any
 
 #include <WiFi.h>
@@ -12,16 +18,16 @@
 #include <Wire.h>
 #include <TinyGsmClient.h>
 #include <HardwareSerial.h>
-HardwareSerial SerialAT (2);
+HardwareSerial SerialSIM (1);
 
 
-//#define DUMP_AT_COMMANDS
+#define DUMP_AT_COMMANDS
 #ifdef DUMP_AT_COMMANDS
   #include <StreamDebugger.h>
-  StreamDebugger debugger(SerialAT, Serial);
+  StreamDebugger debugger(SerialSIM, Serial);
   TinyGsm modem(debugger);
 #else
-  TinyGsm modem(SerialAT);
+  TinyGsm modem(SerialSIM);
 #endif
 
 std::set<String> theSet;
@@ -38,14 +44,12 @@ const char simPIN[]   = "";
 
 // If possible, make this creds written in ESP NVM instead of hardcoding it like this.
 // Will create another file to load and delete NVM if this is going to be implemented.
-const char *ssid = "Vincent";
-const char *password = "blessedfamily";
 
 // MQTT details
 const char* broker = "vulture.rmq.cloudamqp.com";                    // Public IP address or domain name
 const char* mqttUsername = "hqpkkqwz:hqpkkqwz";  // MQTT username
 const char* mqttPassword = "0bPSePKiWVoFBxSZHeQcxNqmYN1bn0Rv";  // MQTT password
-int mqttPort = 8883;
+int mqttPort = 1883;
 const char *ROOT_CERT = "-----BEGIN CERTIFICATE-----\nMIIFYDCCBEigAwIBAgIQQAF3ITfU6UK47naqPGQKtzANBgkqhkiG9w0BAQsFADA/MSQwIgYDVQQKExtEaWdpdGFsIFNpZ25hdHVyZSBUcnVzdCBDby4xFzAVBgNVBAMTDkRTVCBSb290IENBIFgzMB4XDTIxMDEyMDE5MTQwM1oXDTI0MDkzMDE4MTQwM1owTzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2VhcmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQCt6CRz9BQ385ueK1coHIe+3LffOJCMbjzmV6B493XCov71am72AE8o295ohmxEk7axY/0UEmu/H9LqMZshftEzPLpI9d1537O4/xLxIZpLwYqGcWlKZmZsj348cL+tKSIG8+TA5oCu4kuPt5l+lAOf00eXfJlII1PoOK5PCm+DLtFJV4yAdLbaL9A4jXsDcCEbdfIwPPqPrt3aY6vrFk/CjhFLfs8L6P+1dy70sntK4EwSJQxwjQMpoOFTJOwT2e4ZvxCzSow/iaNhUd6shweU9GNx7C7ib1uYgeGJXDR5bHbvO5BieebbpJovJsXQEOEO3tkQjhb7t/eo98flAgeYjzYIlefiN5YNNnWe+w5ysR2bvAP5SQXYgd0FtCrWQemsAXaVCg/Y39W9Eh81LygXbNKYwagJZHduRze6zqxZXmidf3LWicUGQSk+WT7dJvUkyRGnWqNMQB9GoZm1pzpRboY7nn1ypxIFeFntPlF4FQsDj43QLwWyPntKHEtzBRL8xurgUBN8Q5N0s8p0544fAQjQMNRbcTa0B7rBMDBcSLeCO5imfWCKoqMpgsy6vYMEG6KDA0Gh1gXxG8K28Kh8hjtGqEgqiNx2mna/H2qlPRmP6zjzZN7IKw0KKP/32+IVQtQi0Cdd4Xn+GOdwiK1O5tmLOsbdJ1Fu/7xk9TNDTwIDAQABo4IBRjCCAUIwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAQYwSwYIKwYBBQUHAQEEPzA9MDsGCCsGAQUFBzAChi9odHRwOi8vYXBwcy5pZGVudHJ1c3QuY29tL3Jvb3RzL2RzdHJvb3RjYXgzLnA3YzAfBgNVHSMEGDAWgBTEp7Gkeyxx+tvhS5B1/8QVYIWJEDBUBgNVHSAETTBLMAgGBmeBDAECATA/BgsrBgEEAYLfEwEBATAwMC4GCCsGAQUFBwIBFiJodHRwOi8vY3BzLnJvb3QteDEubGV0c2VuY3J5cHQub3JnMDwGA1UdHwQ1MDMwMaAvoC2GK2h0dHA6Ly9jcmwuaWRlbnRydXN0LmNvbS9EU1RST09UQ0FYM0NSTC5jcmwwHQYDVR0OBBYEFHm0WeZ7tuXkAXOACIjIGlj26ZtuMA0GCSqGSIb3DQEBCwUAA4IBAQAKcwBslm7/DlLQrt2M51oGrS+o44+/yQoDFVDC5WxCu2+b9LRPwkSICHXM6webFGJueN7sJ7o5XPWioW5WlHAQU7G75K/QosMrAdSW9MUgNTP52GE24HGNtLi1qoJFlcDyqSMo59ahy2cI2qBDLKobkx/J3vWraV0T9VuGWCLKTVXkcGdtwlfFRjlBz4pYg1htmf5X6DYO8A4jqv2Il9DjXA6USbW1FzXSLr9Ohe8Y4IWS6wY7bCkjCWDcRQJMEhg76fsO3txE+FiYruq9RUWhiF1myv4Q6W+CyBFCDfvp7OOGAN6dEOM4+qR9sdjoSYKEBpsr6GtPAQw4dy753ec5\n-----END CERTIFICATE-----";
 
 const char* topicBus = "/track/bus";
@@ -53,7 +57,7 @@ const char* topicCrowd = "/track/people";
 
 WiFiClientSecure wifiClient;
 TinyGsmClient client(modem);
-PubSubClient mqtt(wifiClient);
+PubSubClient mqtt(client);
 
 #define echoPin  18 
 #define trigPin   5
@@ -127,17 +131,17 @@ void configurePromiscuousWiFi() {
   esp_wifi_set_channel(curChannel, WIFI_SECOND_CHAN_NONE);
 }
 
-void connectToWiFi() {
-  Serial.print("Connecting to ");
- 
-  WiFi.begin(ssid, password);
-  Serial.println(ssid);
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-    delay(500);
-  }
-  Serial.print("Connected.");  
-}
+//void connectToWiFi() {
+//  Serial.print("Connecting to ");
+// 
+//  WiFi.begin(ssid, password);
+//  Serial.println(ssid);
+//  while (WiFi.status() != WL_CONNECTED) {
+//    Serial.print(".");
+//    delay(500);
+//  }
+//  Serial.print("Connected.");  
+//}
 
 bool setPowerBoostKeepOn(int en){
   I2CPower.beginTransmission(IP5306_ADDR);
@@ -152,6 +156,11 @@ bool setPowerBoostKeepOn(int en){
 
 void setupMQTT() {
   mqtt.setServer(broker, mqttPort);
+}
+
+void setupUltrasonic() {
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
 }
 
 void reconnect() {
@@ -205,44 +214,51 @@ void showAll() {
 void setup() {
   // Set console baud rate
   Serial.begin(115200);
-  delay(10);
+  SerialSIM.begin(AT_BAUD_RATE, SERIAL_8N1, 16, 17);
+//  SerialPort2.begin(AT_BAUD_RATE, SERIAL_8N1, 16, 17);
+  delay(6000);
   Serial.println("starting!");
+  setupUltrasonic();
 //  // Start I2C communication
 //  I2CPower.begin(I2C_SDA, I2C_SCL, 400000ul);
 //  
 //  // Keep power when running from battery
-//  bool isOk = setPowerBoostKeepOn(1);
+//  bool isOk = setPowerBoostKeepOn(1);M
 //  Serial.println(String("IP5306 KeepOn ") + (isOk ? "OK" : "FAIL"));
 //  Serial.println("Wait...");
 //
 //  // Set GSM module baud rate and UART pins
-//  SerialAT.begin(115200, SERIAL_8N1, 16, 17);
+//  SerialPort2.begin(115200, SERIAL_8N1, 16, 17);
 //  delay(6000);
 //
 //  // Restart takes quite some time
 //  // To skip it, call init() instead of restart()
-//  Serial.println("Initializing modem...");
-//  modem.restart();
-//  // modem.init();
+  Serial.println("Initializing modem...");
+  modem.restart();
+  modem.setBaud(AT_BAUD_RATE);
+//   modem.init();
 //
-//  String modemInfo = modem.getModemInfo();
-//  Serial.print("Modem Info: ");
-//  Serial.println(modemInfo);
+  String modemInfo = modem.getModemInfo();
+  Serial.print("Modem Info: ");
+  Serial.println(modemInfo);
 //
 //  // Unlock your SIM card with a PIN if needed
 //  //if ( GSM_PIN && modem.getSimStatus() != 3 ) {
 //  //  modem.simUnlock(GSM_PIN);
 //  //}
 //
-//  Serial.print("Connecting to APN: ");
-//  Serial.print(apn);
-//  if (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
-//    Serial.println(" fail");
-//    ESP.restart();
-//  }
-//  else {
-//    Serial.println(" OK");
-//  }
+  if (modem.isNetworkConnected()) {
+    Serial.println("Network connected");
+  }
+  Serial.print("Connecting to APN: ");
+  Serial.print(apn);
+  if (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
+    Serial.println(" fail");
+    ESP.restart();
+  }
+  else {
+    Serial.println(" OK");
+  }
 //  
 //  if (modem.isGprsConnected()) {
 //    Serial.println("GPRS connected");
@@ -267,11 +283,11 @@ void loop() {
     Serial.println("Reset!");
   }
 
-  connectToWiFi();
-  wifiClient.setCACert(ROOT_CERT);
+//  connectToWiFi();
+//  wifiClient.setCACert(ROOT_CERT);
 
-//  int busStatus = checkBus();
-  int busStatus = 1;
+  int busStatus = checkBus();
+//  int busStatus = 1;
 
   if (!mqtt.connected())
     reconnect();
