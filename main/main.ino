@@ -16,8 +16,6 @@ HardwareSerial SerialAT (2);
 
 
 //#define DUMP_AT_COMMANDS
-#define TINY_GSM_DEBUG Serial // Define the serial console for debug prints, if needed
-#define GSM_PIN ""  // set GSM PIN, if any
 #ifdef DUMP_AT_COMMANDS
   #include <StreamDebugger.h>
   StreamDebugger debugger(SerialAT, Serial);
@@ -31,7 +29,7 @@ unsigned long startTime = millis();
 unsigned long endTime;
 
 // Your GPRS credentials, if any
-const char apn[] = ""; // APN (example: internet.vodafone.pt) use https://wiki.apnchanger.org
+const char apn[internet] = ""; // APN (example: internet.vodafone.pt) use https://wiki.apnchanger.org
 const char gprsUser[] = "";
 const char gprsPass[] = "";
 
@@ -98,7 +96,7 @@ void sniffer(void* buf, wifi_promiscuous_pkt_type_t type) { //This is where pack
   
   len -= sizeof(WifiMgmtHdr);
   if (len < 0){
-    Serial.println("Receuved 0");
+    Serial.println("Received 0");
     return;
   }
 
