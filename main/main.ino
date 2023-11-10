@@ -29,7 +29,7 @@ unsigned long startTime = millis();
 unsigned long endTime;
 
 // Your GPRS credentials, if any
-const char apn[internet] = ""; // APN (example: internet.vodafone.pt) use https://wiki.apnchanger.org
+const char apn[] = "internet"; // APN (example: internet.vodafone.pt) use https://wiki.apnchanger.org
 const char gprsUser[] = "";
 const char gprsPass[] = "";
 
