@@ -26,6 +26,23 @@ HardwareSerial SerialSIM (1);
   TinyGsm modem(SerialSIM);
 #endif
 
+// This block of codes is used for
+// enabling/suppressing serial debug
+// Should be DISABLED in production
+// Uncomment line below to enable debug
+#define DEBUG
+#ifdef DEBUG
+#define D_SerialBegin(...) Serial.begin(__VA_ARGS__)
+#define D_print(...)    Serial.print(__VA_ARGS__)
+#define D_write(...)    Serial.write(__VA_ARGS__)
+#define D_println(...)  Serial.println(__VA_ARGS__)
+#else
+#define D_SerialBegin(...)
+#define D_print(...)
+#define D_write(...)
+#define D_println(...)
+#endif
+
 std::set<String> theSet;
 uint32_t startTime = millis();
 uint32_t endTime;
@@ -79,7 +96,7 @@ void sniffer(void* buf, wifi_promiscuous_pkt_type_t type) { //This is where pack
   
   len -= sizeof(WifiMgmtHdr);
   if (len < 0){
-    Serial.println("Received 0");
+    D_println("Received 0");
     return;
   }
 
@@ -120,13 +137,13 @@ void setupUltrasonic() {
 }
 
 void reconnectMQTT() {
-  Serial.println("Connecting to MQTT Broker...");
+  D_println("Connecting to MQTT Broker...");
   while (!mqtt.connected()) {
-      Serial.println("Reconnecting to MQTT Broker..");
+      D_println("Reconnecting to MQTT Broker..");
       String clientId = "ESP32Client-capstone";
       
       if (mqtt.connect(clientId.c_str(), mqttUsername, mqttPassword)) {
-        Serial.println("Connected.");
+        D_println("Connected.");
       }
       
   }
@@ -142,16 +159,16 @@ int checkBus(){
   duration = pulseIn(echoPin, HIGH);
   distance = duration * 0.0344 / 2;
  
-  Serial.print("Distance: ");
-  Serial.print(distance); // Print the output in serial monitor
-  Serial.println(" cm");
+  D_print("Distance: ");
+  D_print(distance); // Print the output in serial monitor
+  D_println(" cm");
 
   bool busArrived = false;
   if(distance > 400){
-    Serial.println("Tidak ada bus");
+    D_println("Tidak ada bus");
     busArrived = false;
   } else{
-    Serial.println("Ada bus");
+    D_println("Ada bus");
     busArrived = true;
   }
 
@@ -160,47 +177,47 @@ int checkBus(){
 
 void showAll() {
   std::for_each(theSet.cbegin(), theSet.cend(), [](String x) {
-    Serial.println(x);
+    D_println(x);
   });
-  Serial.print("Set: ");
-  Serial.println(theSet.size());
+  D_print("Set: ");
+  D_println(theSet.size());
 }
 
 void setup() {
   // Set console baud rate
-  Serial.begin(115200);
+  D_SerialBegin(115200);
   SerialSIM.begin(AT_BAUD_RATE, SERIAL_8N1, 16, 17);
   delay(6000);
-  Serial.println("starting!");
+  D_println("starting!");
   setupUltrasonic();
   
   // Restart takes quite some time
   // To skip it, call init() instead of restart()
-  Serial.println("Initializing modem...");
+  D_println("Initializing modem...");
   modem.restart();
   modem.setBaud(AT_BAUD_RATE);
 
   String modemInfo = modem.getModemInfo();
-  Serial.print("Modem Info: ");
-  Serial.println(modemInfo);
+  D_print("Modem Info: ");
+  D_println(modemInfo);
   
   if (modem.isNetworkConnected()) {
-    Serial.println("Network connected");
+    D_println("Network connected");
   }
-  Serial.print("Connecting to APN: ");
-  Serial.println(apn);
+  D_print("Connecting to APN: ");
+  D_println(apn);
 
   startTime = millis();
   while (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
-    Serial.println(" fail");
+    D_println(" fail");
     if (millis() - startTime > GENERAL_TIMEOUT) {
       ESP.restart();
     }
   }
-  Serial.println("GPRS Connect OK");
+  D_println("GPRS Connect OK");
   
   if (modem.isGprsConnected()) {
-    Serial.println("GPRS connected");
+    D_println("GPRS connected");
   }
 
   setupMQTT();
@@ -216,7 +233,7 @@ void loop() {
   if (endTime - startTime > 4000) {
     theSet.clear();
     startTime = millis();
-    Serial.println("Reset!");
+    D_println("Reset!");
   }
 
   bool busStatus = checkBus();
@@ -224,7 +241,8 @@ void loop() {
   if (!mqtt.connected())
     reconnectMQTT();
   mqtt.publish(topicCrowd, String(theSet.size()).c_str());
-  if (busStatus) mqtt.publish(topicBus, String(busStatus).c_str());
+  if (busStatus)
+    mqtt.publish(topicBus, String(busStatus).c_str());
   delay(10000);
 
   mqtt.loop();
