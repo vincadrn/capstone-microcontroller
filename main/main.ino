@@ -86,8 +86,6 @@ typedef struct { // still dont know much about this
 } __attribute__((packed)) WifiMgmtHdr;
 
 int curChannel = 1;
-long duration;
-int distance;
 
 void sniffer(void* buf, wifi_promiscuous_pkt_type_t type) { //This is where packets end up after they get sniffed
   wifi_promiscuous_pkt_t *p = (wifi_promiscuous_pkt_t*)buf; // Dont know what these 3 lines do
@@ -150,14 +148,20 @@ void reconnectMQTT() {
 }
 
 int checkBus(){
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
+  float duration = 0.0;
+  float distance = 0.0;
+  
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(2);
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
 
-  duration = pulseIn(echoPin, HIGH);
-  distance = duration * 0.0344 / 2;
+    duration += pulseIn(echoPin, HIGH);
+  }
+
+  distance = (duration / 3) * 0.0344 / 2;
  
   D_print("Distance: ");
   D_print(distance); // Print the output in serial monitor
