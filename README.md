@@ -1,5 +1,11 @@
 # ESP32 Firmware for Capstone Project
 
+## Ultrasonic test
+The ultrasonic has been tested to be working, with some caveats:
+- To filter noise, three measurements are averaged.
+- The ultrasonic seems to pick up the sonic bounce from below it.
+    - Solution: Use some kind of suppressor (e.g. sponge, cloth, etc.) around the sensor, especially the bottom side.
+
 ## SIM800L test configurations
 Since SIM800L module is kind of hard to test and debug, let alone make it works properly, this is an effort to see things more clearly.
 ### SIM800L pinout and wirings
