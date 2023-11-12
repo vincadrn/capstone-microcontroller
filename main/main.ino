@@ -6,7 +6,10 @@
 // This is only needed for this example, not in other code.
 #define TINY_GSM_USE_GPRS true
 #define TINY_GSM_USE_WIFI false
-#define GENERAL_TIMEOUT 60000   // in ms
+#define CROWD_COUNTING_PERIOD 120000   // in ms, should be 2-3 minutes
+#define GENERAL_TIMEOUT 60000          // in ms, should be 60 seconds
+#define WAKEUP_TIME 10000              // in ms, should be 10 seconds, intended for ultrasonic polling
+#define us_TO_ms_FACTOR 1000          
 
 #include <PubSubClient.h>
 #include <algorithm>
@@ -44,8 +47,8 @@ HardwareSerial SerialSIM (1);
 #endif
 
 std::set<String> theSet;
-uint32_t startTime = millis();
-uint32_t endTime;
+RTC_DATA_ATTR uint32_t g_millisOffset = 0;
+RTC_DATA_ATTR uint32_t g_prevTime = millis();
 
 // GPRS creds
 const char apn[] = "internet";  // by.u, Indosat
@@ -64,6 +67,7 @@ const char* topicCrowd = "/track/people";
 TinyGsmClient client(modem);
 PubSubClient mqtt(client);
 
+#define simDTR   21
 #define echoPin  18 
 #define trigPin   5
 
@@ -136,14 +140,52 @@ void setupUltrasonic() {
 
 void reconnectMQTT() {
   D_println("Connecting to MQTT Broker...");
+
+  uint32_t startTime = millis();
   while (!mqtt.connected()) {
-      D_println("Reconnecting to MQTT Broker..");
-      String clientId = "ESP32Client-capstone";
-      
-      if (mqtt.connect(clientId.c_str(), mqttUsername, mqttPassword)) {
-        D_println("Connected.");
-      }
-      
+    D_println("Reconnecting to MQTT Broker..");
+    String clientId = "ESP32Client-capstone";
+    
+    if (millis() - startTime > GENERAL_TIMEOUT) {
+      ESP.restart();
+    }
+    
+    if (mqtt.connect(clientId.c_str(), mqttUsername, mqttPassword)) {
+      D_println("Connected.");
+    }
+  }
+}
+
+void connectGPRS() {
+  if (modem.isGprsConnected()) {
+    D_println("GPRS connected");
+    return;
+  }
+
+  D_print("Connecting to APN: ");
+  D_println(apn);
+  
+  uint32_t startTime = millis();
+  while (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
+    D_println("GPRS connecting...");
+    D_println(" fail");
+    if (millis() - startTime > GENERAL_TIMEOUT) {
+      ESP.restart();
+    }
+    delay(100);
+  }
+  D_println("GPRS Connect OK");
+}
+
+void sleepEnableSIM(bool enable) {
+  digitalWrite(simDTR, (enable ? HIGH : LOW));
+  delay(200);
+  
+  uint32_t startTime = millis();
+  while (!modem.sleepEnable(enable)) {
+    if (millis() - startTime > GENERAL_TIMEOUT) {
+      ESP.restart();
+    }
   }
 }
 
@@ -193,7 +235,14 @@ void setup() {
   SerialSIM.begin(AT_BAUD_RATE, SERIAL_8N1, 16, 17);
   delay(6000);
   D_println("starting!");
+  
+  pinMode(simDTR, OUTPUT);
+  sleepEnableSIM(false);
+  
   setupUltrasonic();
+
+  // Set wakeup timer
+  esp_sleep_enable_timer_wakeup(WAKEUP_TIME * us_TO_ms_FACTOR);
   
   // Restart takes quite some time
   // To skip it, call init() instead of restart()
@@ -205,49 +254,41 @@ void setup() {
   D_print("Modem Info: ");
   D_println(modemInfo);
   
-  if (modem.isNetworkConnected()) {
-    D_println("Network connected");
-  }
-  D_print("Connecting to APN: ");
-  D_println(apn);
-
-  startTime = millis();
-  while (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
-    D_println(" fail");
-    if (millis() - startTime > GENERAL_TIMEOUT) {
-      ESP.restart();
-    }
-  }
-  D_println("GPRS Connect OK");
-  
-  if (modem.isGprsConnected()) {
-    D_println("GPRS connected");
-  }
+  connectGPRS();
 
   setupMQTT();
+
+  if (g_millisOffset - g_prevTime > CROWD_COUNTING_PERIOD) {
+    configurePromiscuousWiFi();
+    delay(2000);
+
+    esp_wifi_set_channel(curChannel, WIFI_SECOND_CHAN_NONE);
+    showAll();
+
+    esp_wifi_stop();
+
+    if (!mqtt.connected())
+      reconnectMQTT();
+    mqtt.publish(topicCrowd, String(theSet.size()).c_str());
+
+    g_prevTime = g_millisOffset;
+  }
+
+  theSet.clear();
 }
 
 void loop() {
-  configurePromiscuousWiFi();
-
-  esp_wifi_set_channel(curChannel, WIFI_SECOND_CHAN_NONE);
-  showAll();
-  endTime = millis();
-
-  if (endTime - startTime > 4000) {
-    theSet.clear();
-    startTime = millis();
-    D_println("Reset!");
-  }
-
   bool busStatus = checkBus();
 
-  if (!mqtt.connected())
-    reconnectMQTT();
-  mqtt.publish(topicCrowd, String(theSet.size()).c_str());
-  if (busStatus)
+  if (busStatus) {
+    if (!mqtt.connected())
+      reconnectMQTT();
+    
     mqtt.publish(topicBus, String(busStatus).c_str());
-  delay(10000);
+  }
+  
+  sleepEnableSIM(true);
 
-  mqtt.loop();
+  g_millisOffset += millis() + WAKEUP_TIME;
+  esp_deep_sleep_start();
 }
