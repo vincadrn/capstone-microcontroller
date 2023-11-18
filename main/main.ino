@@ -6,16 +6,17 @@
 // This is only needed for this example, not in other code.
 #define TINY_GSM_USE_GPRS true
 #define TINY_GSM_USE_WIFI false
-#define CROWD_COUNTING_PERIOD 120000   // in ms, should be 2-3 minutes
+#define CROWD_COUNTING_PERIOD 150000   // in ms, should be every 150 seconds
 #define GENERAL_TIMEOUT 60000          // in ms, should be 60 seconds
 #define WAKEUP_TIME 10000              // in ms, should be 10 seconds, intended for ultrasonic polling
-#define us_TO_ms_FACTOR 1000          
+#define us_TO_ms_FACTOR 1000ULL          
 
 #include <PubSubClient.h>
 #include <algorithm>
 #include <set>
 #include "esp_wifi.h"
 #include "mqtt_client.h"
+#include "esp_sleep.h"
 #include "time.h"
 #include <TinyGsmClient.h>
 #include <HardwareSerial.h>
@@ -49,11 +50,10 @@ HardwareSerial SerialSIM (1);
 
 std::set<String> theSet;
 RTC_DATA_ATTR uint32_t g_millisOffset = 0;
-RTC_DATA_ATTR uint32_t g_prevTime = millis();
 
 struct tm timeInfo;
 const char* ntpServer = "pool.ntp.org";
-const long gmtOffsetSec = 0;
+const long gmtOffsetSec = 7 * 3600;
 const int daylightOffsetSec = 0;
 const int sleepAfterSec = 19 * 3600 + 30 * 60;   // sleep after 19:30
 const int wakeupAfterSec = 6 * 3600 + 30 * 60;   // wakeup after 06:30
@@ -209,9 +209,10 @@ void getActualTime() {
 }
 
 void checkForSleep() {
-  int currentTimeInSec = timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60;
-  
-  if (currentTimeInSec > wakeupAfterSec && currentTimeInSec < sleepAfterSec) {
+  int currentTimeInSec = timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec;
+
+  // If it is Monday (1) - Friday (5) and in working hours, don't sleep
+  if (timeInfo.tm_wday != 0 && timeInfo.tm_wday != 6 && currentTimeInSec > wakeupAfterSec && currentTimeInSec < sleepAfterSec) {
     D_println("Not yet the time to sleep");
     return;
   } else {
@@ -223,9 +224,15 @@ void checkForSleep() {
     06:30 - 00:00 = 6h30m
     */
     int sleepDurationInSec = wakeupAfterSec - currentTimeInSec;
+    D_print("Wakeup after sec: ");
+    D_println(wakeupAfterSec);
+    D_print("Current time sec: ");
+    D_println(currentTimeInSec);
     if (sleepDurationInSec < 0) {
       sleepDurationInSec += 24 * 3600;
     }
+    D_print("Sleep duration in sec: ");
+    D_println(sleepDurationInSec);
     esp_sleep_enable_timer_wakeup(sleepDurationInSec * 1000 * us_TO_ms_FACTOR);
     D_print("Sleeping for ");
     D_print(sleepDurationInSec);
@@ -285,10 +292,7 @@ void setup() {
   sleepEnableSIM(false);
   
   setupUltrasonic();
-
-  // Set wakeup timer
-  esp_sleep_enable_timer_wakeup(WAKEUP_TIME * us_TO_ms_FACTOR);
-  
+    
   // Restart takes quite some time
   // To skip it, call init() instead of restart()
   D_println("Initializing modem...");
@@ -309,7 +313,8 @@ void setup() {
 
   checkForSleep();
 
-  if (g_millisOffset - g_prevTime > CROWD_COUNTING_PERIOD) {
+  if (g_millisOffset > CROWD_COUNTING_PERIOD) {
+    D_println("Entering promiscuous WiFi ...");
     configurePromiscuousWiFi();
     delay(2000);
 
@@ -322,7 +327,7 @@ void setup() {
       reconnectMQTT();
     mqtt.publish(topicCrowd, String(theSet.size()).c_str());
 
-    g_prevTime = g_millisOffset;
+    g_millisOffset = 0;
   }
 
   theSet.clear();
@@ -341,5 +346,7 @@ void loop() {
   sleepEnableSIM(true);
 
   g_millisOffset += millis() + WAKEUP_TIME;
+  D_println("Initiating periodic nap ...");
+  esp_sleep_enable_timer_wakeup(WAKEUP_TIME * us_TO_ms_FACTOR);
   esp_deep_sleep_start();
 }
