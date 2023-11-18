@@ -16,6 +16,7 @@
 #include <set>
 #include "esp_wifi.h"
 #include "mqtt_client.h"
+#include "time.h"
 #include <TinyGsmClient.h>
 #include <HardwareSerial.h>
 HardwareSerial SerialSIM (1);
@@ -49,6 +50,13 @@ HardwareSerial SerialSIM (1);
 std::set<String> theSet;
 RTC_DATA_ATTR uint32_t g_millisOffset = 0;
 RTC_DATA_ATTR uint32_t g_prevTime = millis();
+
+struct tm timeInfo;
+const char* ntpServer = "pool.ntp.org";
+const long gmtOffsetSec = 0;
+const int daylightOffsetSec = 0;
+const int sleepAfterSec = 19 * 3600 + 30 * 60;   // sleep after 19:30
+const int wakeupAfterSec = 6 * 3600 + 30 * 60;   // wakeup after 06:30
 
 // GPRS creds
 const char apn[] = "internet";  // by.u, Indosat
@@ -189,6 +197,43 @@ void sleepEnableSIM(bool enable) {
   }
 }
 
+void getActualTime() {
+  configTime(gmtOffsetSec, daylightOffsetSec, ntpServer);
+  
+  uint32_t startTime = millis();
+  while (!getLocalTime(&timeInfo)) {
+    if (millis() - startTime > GENERAL_TIMEOUT) {
+      ESP.restart();
+    }
+  }
+}
+
+void checkForSleep() {
+  int currentTimeInSec = timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60;
+  
+  if (currentTimeInSec > wakeupAfterSec && currentTimeInSec < sleepAfterSec) {
+    D_println("Not yet the time to sleep");
+    return;
+  } else {
+    /* Algorithm for counting sleep needed
+    End - start. If < 0, add 24h. It means the hour <= 23
+    Example 1: now is 20:00 (if for some reason the system doesn't sleep on time),
+    then needed sleep is 06:30 - 20:00 = -13:30 + 24 = 10h30m
+    Example 2: now is 00:00, then needed sleep is
+    06:30 - 00:00 = 6h30m
+    */
+    int sleepDurationInSec = wakeupAfterSec - currentTimeInSec;
+    if (sleepDurationInSec < 0) {
+      sleepDurationInSec += 24 * 3600;
+    }
+    esp_sleep_enable_timer_wakeup(sleepDurationInSec * 1000 * us_TO_ms_FACTOR);
+    D_print("Sleeping for ");
+    D_print(sleepDurationInSec);
+    D_println(" second(s)");
+    esp_deep_sleep_start();
+  }
+}
+
 int checkBus(){
   float duration = 0.0;
   float distance = 0.0;
@@ -257,6 +302,12 @@ void setup() {
   connectGPRS();
 
   setupMQTT();
+
+  getActualTime();
+
+  D_println(&timeInfo, "%A, %B %d %Y %H:%M:%S");
+
+  checkForSleep();
 
   if (g_millisOffset - g_prevTime > CROWD_COUNTING_PERIOD) {
     configurePromiscuousWiFi();
