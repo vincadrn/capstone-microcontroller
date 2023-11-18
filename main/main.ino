@@ -8,7 +8,7 @@
 #define TINY_GSM_USE_WIFI false
 #define CROWD_COUNTING_PERIOD 150000   // in ms, should be every 150 seconds
 #define GENERAL_TIMEOUT 60000          // in ms, should be 60 seconds
-#define WAKEUP_TIME 10000              // in ms, should be 10 seconds, intended for ultrasonic polling
+#define WAKEUP_TIME 20000              // in ms, should be 20 seconds, intended for ultrasonic polling
 #define us_TO_ms_FACTOR 1000ULL          
 
 #include <PubSubClient.h>
@@ -49,7 +49,7 @@ HardwareSerial SerialSIM (1);
 #endif
 
 std::set<String> theSet;
-RTC_DATA_ATTR uint32_t g_millisOffset = 0;
+RTC_DATA_ATTR uint32_t g_millisOffset = CROWD_COUNTING_PERIOD + 1;  // to force it at first start
 
 typedef struct gsmTime {
   int dayOfWeek;
@@ -62,8 +62,8 @@ typedef struct gsmTime {
   float timezone;
 } gsmTime;
 gsmTime timeInfo;
-const int sleepAfterSec = 19 * 3600 + 30 * 60;   // sleep after 19:30
-const int wakeupAfterSec = 6 * 3600 + 30 * 60;   // wakeup after 06:30
+const int sleepAfterSec = 19 * 3600 + 00 * 60;   // sleep after 19:00
+const int wakeupAfterSec = 7 * 3600 + 00 * 60;   // wakeup after 07:00
 
 // GPRS creds
 const char apn[] = "internet";  // by.u, Indosat
@@ -253,7 +253,8 @@ void checkForSleep() {
     }
     D_print("Sleep duration in sec: ");
     D_println(sleepDurationInSec);
-    
+
+    modem.gprsDisconnect();
     sleepEnableSIM(true);
     
     esp_sleep_enable_timer_wakeup(sleepDurationInSec * 1000 * us_TO_ms_FACTOR);
@@ -325,7 +326,7 @@ void setup() {
   String modemInfo = modem.getModemInfo();
   D_print("Modem Info: ");
   D_println(modemInfo);
-  
+
   connectGPRS();
 
   setupMQTT();
