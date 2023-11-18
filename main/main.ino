@@ -319,15 +319,13 @@ void setup() {
     
   // Restart takes quite some time
   // To skip it, call init() instead of restart()
-  if (!modem.isGprsConnected()) {
-    D_println("Initializing modem...");
-    modem.restart();
-    modem.setBaud(AT_BAUD_RATE);
+  D_println("Initializing modem...");
+  modem.restart();
+  modem.setBaud(AT_BAUD_RATE);
 
-    String modemInfo = modem.getModemInfo();
-    D_print("Modem Info: ");
-    D_println(modemInfo);
-  }
+  String modemInfo = modem.getModemInfo();
+  D_print("Modem Info: ");
+  D_println(modemInfo);
 
   connectGPRS();
 
