@@ -51,10 +51,17 @@ HardwareSerial SerialSIM (1);
 std::set<String> theSet;
 RTC_DATA_ATTR uint32_t g_millisOffset = 0;
 
-struct tm timeInfo;
-const char* ntpServer = "pool.ntp.org";
-const long gmtOffsetSec = 7 * 3600;
-const int daylightOffsetSec = 0;
+typedef struct gsmTime {
+  int dayOfWeek;
+  int year;
+  int month;
+  int day;
+  int hour;
+  int minute;
+  int second;
+  float timezone;
+} gsmTime;
+gsmTime timeInfo;
 const int sleepAfterSec = 19 * 3600 + 30 * 60;   // sleep after 19:30
 const int wakeupAfterSec = 6 * 3600 + 30 * 60;   // wakeup after 06:30
 
@@ -182,7 +189,9 @@ void connectGPRS() {
     }
     delay(100);
   }
-  D_println("GPRS Connect OK");
+  if (modem.isGprsConnected()) {
+    D_println("GPRS Connect OK");
+  }
 }
 
 void sleepEnableSIM(bool enable) {
@@ -197,22 +206,35 @@ void sleepEnableSIM(bool enable) {
   }
 }
 
+int getDayOfWeek(int d, int m, int y) {
+  // 0: Sunday, 1: Monday, etc.
+  static int t[] = { 0, 3, 2, 5, 0, 3,
+                       5, 1, 4, 6, 2, 4 }; 
+  y -= m < 3;
+  return ( y + y / 4 - y / 100 + 
+           y / 400 + t[m - 1] + d) % 7; 
+}
+
 void getActualTime() {
-  configTime(gmtOffsetSec, daylightOffsetSec, ntpServer);
-  
+  D_println("Getting actual time ...");
   uint32_t startTime = millis();
-  while (!getLocalTime(&timeInfo)) {
+  while (!modem.getNetworkTime(&(timeInfo.year), &(timeInfo.month), &(timeInfo.day), &(timeInfo.hour), &(timeInfo.minute), &(timeInfo.second), &(timeInfo.timezone))) {
     if (millis() - startTime > GENERAL_TIMEOUT) {
       ESP.restart();
     }
   }
+  timeInfo.dayOfWeek = getDayOfWeek(timeInfo.day, timeInfo.month, timeInfo.year);
+  
+  D_println(String(timeInfo.dayOfWeek) + ", " + String(timeInfo.year) + "-" + String(timeInfo.month) + "-" + String(timeInfo.day) + " " + String(timeInfo.hour) + ":" + String(timeInfo.minute) + ":" + String(timeInfo.second) + "+" + String(timeInfo.timezone));
 }
 
 void checkForSleep() {
-  int currentTimeInSec = timeInfo.tm_hour * 3600 + timeInfo.tm_min * 60 + timeInfo.tm_sec;
+  int currentTimeInSec = timeInfo.hour * 3600 + timeInfo.minute * 60 + timeInfo.second;
+  D_print("Current time sec: ");
+  D_println(currentTimeInSec);
 
   // If it is Monday (1) - Friday (5) and in working hours, don't sleep
-  if (timeInfo.tm_wday != 0 && timeInfo.tm_wday != 6 && currentTimeInSec > wakeupAfterSec && currentTimeInSec < sleepAfterSec) {
+  if (timeInfo.dayOfWeek != 0 && timeInfo.dayOfWeek != 6 && currentTimeInSec > wakeupAfterSec && currentTimeInSec < sleepAfterSec) {
     D_println("Not yet the time to sleep");
     return;
   } else {
@@ -226,13 +248,14 @@ void checkForSleep() {
     int sleepDurationInSec = wakeupAfterSec - currentTimeInSec;
     D_print("Wakeup after sec: ");
     D_println(wakeupAfterSec);
-    D_print("Current time sec: ");
-    D_println(currentTimeInSec);
     if (sleepDurationInSec < 0) {
       sleepDurationInSec += 24 * 3600;
     }
     D_print("Sleep duration in sec: ");
     D_println(sleepDurationInSec);
+    
+    sleepEnableSIM(true);
+    
     esp_sleep_enable_timer_wakeup(sleepDurationInSec * 1000 * us_TO_ms_FACTOR);
     D_print("Sleeping for ");
     D_print(sleepDurationInSec);
@@ -308,8 +331,6 @@ void setup() {
   setupMQTT();
 
   getActualTime();
-
-  D_println(&timeInfo, "%A, %B %d %Y %H:%M:%S");
 
   checkForSleep();
 
