@@ -8,7 +8,7 @@
 #define TINY_GSM_USE_WIFI false
 #define CROWD_COUNTING_PERIOD 150000   // in ms, should be every 150 seconds
 #define GENERAL_TIMEOUT 60000          // in ms, should be 60 seconds
-#define WAKEUP_TIME 20000              // in ms, should be 20 seconds, intended for ultrasonic polling
+#define WAKEUP_TIME 15000              // in ms, should be 15 seconds, intended for ultrasonic polling
 #define us_TO_ms_FACTOR 1000ULL          
 
 #include <PubSubClient.h>
@@ -334,6 +334,16 @@ void setup() {
   getActualTime();
 
   checkForSleep();
+
+  modem.sendAT(GF("+HTTPINIT"));
+  D_println(modem.waitResponse());
+  modem.sendAT(GF("+HTTPPARA=\"CID\",1"));
+  D_println(modem.waitResponse());
+  modem.sendAT(GF("+HTTPPARA=\"URL\",\"http://vincadrn.alwaysdata.net\""));
+  D_println(modem.waitResponse());
+  modem.sendAT(GF("+HTTPACTION=0"));
+  D_println(modem.waitResponse());
+  modem.sendAT(GF("+HTTPTERM"));
 
   if (g_millisOffset > CROWD_COUNTING_PERIOD) {
     D_println("Entering promiscuous WiFi ...");
