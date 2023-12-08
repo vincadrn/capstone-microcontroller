@@ -84,8 +84,8 @@ TinyGsmClient client(modem);
 PubSubClient mqtt(client);
 
 #define simDTR   21
-#define echoPin  18 
-#define trigPin   5
+#define echoPin  5 
+#define trigPin  18
 
 const wifi_promiscuous_filter_t filt={ //Idk what this does
     .filter_mask=WIFI_PROMIS_FILTER_MASK_MGMT|WIFI_PROMIS_FILTER_MASK_DATA
@@ -333,9 +333,6 @@ void setup() {
   setupMQTT();
 
   getActualTime();
-
-  // Saturday testing
-  timeInfo.dayOfWeek = 6;
 
   checkForSleep();
 
