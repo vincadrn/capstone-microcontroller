@@ -63,6 +63,7 @@ typedef struct gsmTime {
 } gsmTime;
 gsmTime timeInfo;
 const int sleepAfterSec = 19 * 3600 + 00 * 60;   // sleep after 19:00
+const int sleepAfterSecSat = 13 * 3600 + 00 * 60; // sleep after 13:00 on Saturday
 const int wakeupAfterSec = 7 * 3600 + 00 * 60;   // wakeup after 07:00
 
 // GPRS creds
@@ -234,7 +235,7 @@ void checkForSleep() {
   D_println(currentTimeInSec);
 
   // If it is Monday (1) - Friday (5) and in working hours, don't sleep
-  if (timeInfo.dayOfWeek != 0 && timeInfo.dayOfWeek != 6 && currentTimeInSec > wakeupAfterSec && currentTimeInSec < sleepAfterSec) {
+  if (timeInfo.dayOfWeek != 0 && !(timeInfo.dayOfWeek == 6 && (currentTimeInSec < wakeupAfterSec || currentTimeInSec > sleepAfterSecSat)) && currentTimeInSec > wakeupAfterSec && currentTimeInSec < sleepAfterSec) {
     D_println("Not yet the time to sleep");
     return;
   } else {
@@ -332,6 +333,9 @@ void setup() {
   setupMQTT();
 
   getActualTime();
+
+  // Saturday testing
+  timeInfo.dayOfWeek = 6;
 
   checkForSleep();
 
